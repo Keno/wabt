@@ -52,6 +52,7 @@ class BinaryReaderObjdumpBase : public BinaryReaderNop {
   string_view GetGlobalName(Index index) const;
   string_view GetSectionName(Index index) const;
   string_view GetEventName(Index index) const;
+  string_view GetTableName(Index index) const;
   string_view GetSymbolName(Index index) const;
   string_view GetSegmentName(Index index) const;
   void PrintRelocation(const Reloc& reloc, Offset offset) const;
@@ -141,6 +142,10 @@ string_view BinaryReaderObjdumpBase::GetEventName(Index index) const {
   return objdump_state_->event_names.Get(index);
 }
 
+string_view BinaryReaderObjdumpBase::GetTableName(Index index) const {
+  return objdump_state_->table_names.Get(index);
+}
+
 string_view BinaryReaderObjdumpBase::GetSegmentName(Index index) const {
   return objdump_state_->segment_names.Get(index);
 }
@@ -159,6 +164,8 @@ string_view BinaryReaderObjdumpBase::GetSymbolName(Index symbol_index) const {
       return GetSectionName(sym.index);
     case SymbolType::Event:
       return GetEventName(sym.index);
+    case SymbolType::Table:
+      return GetTableName(sym.index);
   }
   WABT_UNREACHABLE;
 }
@@ -273,6 +280,18 @@ class BinaryReaderObjdumpPrepass : public BinaryReaderObjdumpBase {
     return Result::Ok;
   }
 
+  Result OnTableSymbol(Index index,
+                        uint32_t flags,
+                        string_view name,
+                        Index table_index) override {
+    if (!name.empty()) {
+      SetTableName(table_index, name);
+    }
+    objdump_state_->symtab[index] = {SymbolType::Table, name.to_string(),
+                                     table_index};
+    return Result::Ok;
+  }
+
   Result OnImportFunc(Index import_index,
                       string_view module_name,
                       string_view field_name,
@@ -341,6 +360,7 @@ class BinaryReaderObjdumpPrepass : public BinaryReaderObjdumpBase {
   void SetFunctionName(Index index, string_view name);
   void SetGlobalName(Index index, string_view name);
   void SetEventName(Index index, string_view name);
+  void SetTableName(Index index, string_view name);
   void SetSegmentName(Index index, string_view name);
 };
 
@@ -355,6 +375,10 @@ void BinaryReaderObjdumpPrepass::SetGlobalName(Index index, string_view name) {
 
 void BinaryReaderObjdumpPrepass::SetEventName(Index index, string_view name) {
   objdump_state_->event_names.Set(index, name);
+}
+
+void BinaryReaderObjdumpPrepass::SetTableName(Index index, string_view name) {
+  objdump_state_->table_names.Set(index, name);
 }
 
 void BinaryReaderObjdumpPrepass::SetSegmentName(Index index, string_view name) {
@@ -859,6 +883,10 @@ class BinaryReaderObjdump : public BinaryReaderObjdumpBase {
                        uint32_t flags,
                        string_view name,
                        Index event_index) override;
+  Result OnTableSymbol(Index index,
+                       uint32_t flags,
+                       string_view name,
+                       Index table_index) override;
   Result OnSegmentInfoCount(Index count) override;
   Result OnSegmentInfo(Index index,
                        string_view name,
@@ -1638,6 +1666,19 @@ Result BinaryReaderObjdump::OnEventSymbol(Index index,
   }
   PrintDetails("   - [%d] E <" PRIstringview "> event=%" PRIindex, index,
                WABT_PRINTF_STRING_VIEW_ARG(name), event_index);
+  PrintSymbolFlags(flags);
+  return Result::Ok;
+}
+
+Result BinaryReaderObjdump::OnTableSymbol(Index index,
+                                          uint32_t flags,
+                                          string_view name,
+                                          Index table_index) {
+  if (name.empty()) {
+    name = GetTableName(table_index);
+  }
+  PrintDetails("   - [%d] E <" PRIstringview "> event=%" PRIindex, index,
+               WABT_PRINTF_STRING_VIEW_ARG(name), table_index);
   PrintSymbolFlags(flags);
   return Result::Ok;
 }

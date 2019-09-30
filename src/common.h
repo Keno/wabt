@@ -264,6 +264,7 @@ enum class SymbolType {
   Global = 2,
   Section = 3,
   Event = 4,
+  Table = 5,
 };
 
 enum class ComdatType {
@@ -354,6 +355,8 @@ static WABT_INLINE const char* GetSymbolTypeName(SymbolType type) {
       return "section";
     case SymbolType::Event:
       return "event";
+    case SymbolType::Table:
+      return "table";
     default:
       return "<error_symbol_type>";
   }
